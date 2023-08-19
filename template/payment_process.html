@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>Payment Process</h2>
+  <form id="payment-form">
+    <div id="card-element">
+      <!-- A Stripe Element will be inserted here. -->
+    </div>
+
+    <!-- Used to display form errors. -->
+    <div id="card-errors" role="alert"></div>
+
+    <button id="submit">Pay</button>
+  </form>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    var stripe = Stripe('{{ settings.STRIPE_PUBLISHABLE_KEY }}');
+    var elements = stripe.elements();
+    var cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+
+    var cardErrors = document.getElementById('card-errors');
+
+    var form = document.getElementById('payment-form');
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+      }).then(function(result) {
+        if (result.error) {
+          cardErrors.textContent = result.error.message;
+        } else {
+          // Send the payment method ID to your server.
+          // You can handle the payment confirmation on the server side.
+          fetch('/process_payment/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+              payment_method_id: result.paymentMethod.id,
+            })
+          }).then(function(response) {
+            return response.json();
+          }).then(function(data) {
+            // Handle the response from the server.
+            if (data.status === 'succeeded') {
+              alert('Payment successful! Your order has been confirmed.');
+              window.location.href = '{% url "cart" %}';
+            } else {
+              alert('Payment failed. Please try again.');
+            }
+          });
+        }
+      });
+    });
+  </script>
+{% endblock %}
